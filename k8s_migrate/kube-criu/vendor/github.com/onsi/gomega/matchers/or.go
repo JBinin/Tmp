@@ -1,0 +1,78 @@
+/*
+Copyright (c) 2014-2020 CGCL Labs
+Container_Migrate is licensed under Mulan PSL v2.
+You can use this software according to the terms and conditions of the Mulan PSL v2.
+You may obtain a copy of Mulan PSL v2 at:
+         http://license.coscl.org.cn/MulanPSL2
+THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
+EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
+MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+See the Mulan PSL v2 for more details.
+*/
+package matchers
+
+import (
+	"fmt"
+
+	"github.com/onsi/gomega/format"
+	"github.com/onsi/gomega/internal/oraclematcher"
+	"github.com/onsi/gomega/types"
+)
+
+type OrMatcher struct {
+	Matchers []types.GomegaMatcher
+
+	// state
+	firstSuccessfulMatcher types.GomegaMatcher
+}
+
+func (m *OrMatcher) Match(actual interface{}) (success bool, err error) {
+	m.firstSuccessfulMatcher = nil
+	for _, matcher := range m.Matchers {
+		success, err := matcher.Match(actual)
+		if err != nil {
+			return false, err
+		}
+		if success {
+			m.firstSuccessfulMatcher = matcher
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (m *OrMatcher) FailureMessage(actual interface{}) (message string) {
+	// not the most beautiful list of matchers, but not bad either...
+	return format.Message(actual, fmt.Sprintf("To satisfy at least one of these matchers: %s", m.Matchers))
+}
+
+func (m *OrMatcher) NegatedFailureMessage(actual interface{}) (message string) {
+	return m.firstSuccessfulMatcher.NegatedFailureMessage(actual)
+}
+
+func (m *OrMatcher) MatchMayChangeInTheFuture(actual interface{}) bool {
+	/*
+		Example with 3 matchers: A, B, C
+
+		Match evaluates them: F, T, <?>  => T
+		So match is currently T, what should MatchMayChangeInTheFuture() return?
+		Seems like it only depends on B, since currently B MUST change to allow the result to become F
+
+		Match eval: F, F, F  => F
+		So match is currently F, what should MatchMayChangeInTheFuture() return?
+		Seems to depend on ANY of them being able to change to T.
+	*/
+
+	if m.firstSuccessfulMatcher != nil {
+		// one of the matchers succeeded.. it must be able to change in order to affect the result
+		return oraclematcher.MatchMayChangeInTheFuture(m.firstSuccessfulMatcher, actual)
+	} else {
+		// so all matchers failed.. Any one of them changing would change the result.
+		for _, matcher := range m.Matchers {
+			if oraclematcher.MatchMayChangeInTheFuture(matcher, actual) {
+				return true
+			}
+		}
+		return false // none of were going to change
+	}
+}
