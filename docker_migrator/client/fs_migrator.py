@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 #
 #Copyright (c) 2014-2020 CGCL Labs
 #Container_Migrate is licensed under Mulan PSL v2.
@@ -53,7 +54,7 @@ class lm_docker_fs(object):
             logging.info("Migrating "+dir_name+" To "+dst+" result ret :%d",ret)
             if ret != 0 and ret != 24:
                 raise Exception("Migrating failed")
-        if self.__cache：
+        if self.__cache:
             os.mkdir("/tmp/cache")
             threads = []
             i = 1
